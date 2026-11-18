@@ -1,0 +1,436 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Internal warehouse stakeholder account with role-based access control and assigned office location.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user.",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified stakeholder email address.",
+          "maxLength": 254
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Stakeholder full name.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "role": {
+          "type": "string",
+          "description": "RBAC role governing warehouse operations.",
+          "enum": ["admin", "manager", "operator", "viewer"]
+        },
+        "assignedLocationId": {
+          "type": "string",
+          "description": "Primary office or warehouse location ID.",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "status": {
+          "type": "string",
+          "description": "Account activation state.",
+          "enum": ["active", "suspended"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of user creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last profile update."
+        }
+      },
+      "required": ["uid", "email", "displayName", "role", "assignedLocationId", "status", "createdAt", "updatedAt"]
+    },
+    "WarehouseLocation": {
+      "title": "WarehouseLocation",
+      "description": "Physical warehouse or office storage facility synchronized in real time.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 24,
+          "pattern": "^[A-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "city": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "region": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 64
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "code", "name", "city", "region", "isActive", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Material": {
+      "title": "Material",
+      "description": "Tracked warehouse material record with barcode, stock threshold, and location.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sku": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 48,
+          "pattern": "^[A-Za-z0-9_.\\-]+$"
+        },
+        "barcode": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_.\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 140
+        },
+        "category": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 64
+        },
+        "locationId": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "binCode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "minStockLevel": {
+          "type": "number"
+        },
+        "unitCost": {
+          "type": "number"
+        },
+        "supplier": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "sku",
+        "barcode",
+        "name",
+        "category",
+        "locationId",
+        "binCode",
+        "quantity",
+        "unit",
+        "minStockLevel",
+        "unitCost",
+        "supplier",
+        "notes",
+        "createdBy",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "InventoryTransaction": {
+      "title": "InventoryTransaction",
+      "description": "Append-only transaction ledger entry atomically linked to material inventory levels.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "materialId": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "materialSku": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 48
+        },
+        "materialName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 140
+        },
+        "type": {
+          "type": "string",
+          "enum": ["IN", "OUT", "ADJUST", "TRANSFER"]
+        },
+        "quantityChange": {
+          "type": "number"
+        },
+        "previousQuantity": {
+          "type": "number"
+        },
+        "newQuantity": {
+          "type": "number"
+        },
+        "locationId": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "targetLocationId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "referenceCode": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "scanMethod": {
+          "type": "string",
+          "enum": ["manual", "usb_scanner", "camera_scanner"]
+        },
+        "operatorId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "operatorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "materialId",
+        "materialSku",
+        "materialName",
+        "type",
+        "quantityChange",
+        "previousQuantity",
+        "newQuantity",
+        "locationId",
+        "targetLocationId",
+        "referenceCode",
+        "reason",
+        "scanMethod",
+        "operatorId",
+        "operatorName",
+        "createdAt"
+      ]
+    },
+    "EncryptedBackup": {
+      "title": "EncryptedBackup",
+      "description": "AES-256-GCM encrypted daily or manual backup record of warehouse inventory and logs.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "backupDate": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["daily_auto", "manual_encrypted"]
+        },
+        "algorithm": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "checksumSha256": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "materialCount": {
+          "type": "number"
+        },
+        "transactionCount": {
+          "type": "number"
+        },
+        "locationCount": {
+          "type": "number"
+        },
+        "encryptedPayload": {
+          "type": "string",
+          "maxLength": 600000
+        },
+        "ivBase64": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "saltBase64": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdByName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "backupDate",
+        "type",
+        "algorithm",
+        "checksumSha256",
+        "materialCount",
+        "transactionCount",
+        "locationCount",
+        "encryptedPayload",
+        "ivBase64",
+        "saltBase64",
+        "createdBy",
+        "createdByName",
+        "createdAt"
+      ]
+    },
+    "BackupPolicy": {
+      "title": "BackupPolicy",
+      "description": "Configuration for automated daily encrypted backup schedule.",
+      "type": "object",
+      "properties": {
+        "dailyAutoEnabled": {
+          "type": "boolean"
+        },
+        "lastBackupDate": {
+          "type": "string",
+          "maxLength": 10
+        },
+        "retentionDays": {
+          "type": "number"
+        },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["dailyAutoEnabled", "lastBackupDate", "retentionDays", "updatedBy", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Internal stakeholder accounts and RBAC role assignments."
+    },
+    "/locations/{locationId}": {
+      "schema": { "$ref": "#/entities/WarehouseLocation" },
+      "description": "Synchronized warehouse and office locations."
+    },
+    "/materials/{materialId}": {
+      "schema": { "$ref": "#/entities/Material" },
+      "description": "Warehouse material catalog and real-time stock quantities."
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/InventoryTransaction" },
+      "description": "Immutable movement ledger recording IN, OUT, ADJUST, and TRANSFER operations."
+    },
+    "/backups/{backupId}": {
+      "schema": { "$ref": "#/entities/EncryptedBackup" },
+      "description": "AES-256-GCM encrypted daily and manual backup records."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/BackupPolicy" },
+      "description": "System backup policy settings."
+    }
+  }
+}

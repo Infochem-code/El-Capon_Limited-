@@ -1,0 +1,373 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Phase 3: Hardened Primitives
+    // -------------------------------------------------------------------------
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdmin() {
+      return isEmailVerified() && request.auth.token.email == 'rma27660@gmail.com';
+    }
+
+    function callerUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function hasCallerProfile() {
+      return isEmailVerified() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isActiveUser() {
+      return isBootstrappedAdmin() || (hasCallerProfile() && callerUserDoc().data.status == 'active');
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (isActiveUser() && callerUserDoc().data.role == 'admin');
+    }
+
+    function isManagerOrAbove() {
+      return isAdmin() || (isActiveUser() && callerUserDoc().data.role in ['admin', 'manager']);
+    }
+
+    function isOperatorOrAbove() {
+      return isAdmin() || (isActiveUser() && callerUserDoc().data.role in ['admin', 'manager', 'operator']);
+    }
+
+    function isViewerOrAbove() {
+      return isAdmin() || (isActiveUser() && callerUserDoc().data.role in ['admin', 'manager', 'operator', 'viewer']);
+    }
+
+    // -------------------------------------------------------------------------
+    // Validation Blueprints (Phase 4)
+    // -------------------------------------------------------------------------
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+          'uid', 'email', 'displayName', 'role', 'assignedLocationId', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid', 'email', 'displayName', 'role', 'assignedLocationId', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+        data.role in ['admin', 'manager', 'operator', 'viewer'] &&
+        isValidId(data.assignedLocationId) && data.assignedLocationId.size() <= 64 &&
+        data.status in ['active', 'suspended'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidLocation(data) {
+      return data.keys().hasAll([
+          'id', 'code', 'name', 'city', 'region', 'isActive', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'code', 'name', 'city', 'region', 'isActive', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) && data.id.size() <= 64 &&
+        data.code is string && data.code.size() >= 2 && data.code.size() <= 24 && data.code.matches('^[A-Z0-9_\\-]+$') &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 100 &&
+        data.city is string && data.city.size() >= 2 && data.city.size() <= 100 &&
+        data.region is string && data.region.size() >= 2 && data.region.size() <= 64 &&
+        data.isActive is bool &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidMaterial(data) {
+      return data.keys().hasAll([
+          'id', 'sku', 'barcode', 'name', 'category', 'locationId', 'binCode',
+          'quantity', 'unit', 'minStockLevel', 'unitCost', 'supplier', 'notes',
+          'createdBy', 'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'sku', 'barcode', 'name', 'category', 'locationId', 'binCode',
+          'quantity', 'unit', 'minStockLevel', 'unitCost', 'supplier', 'notes',
+          'createdBy', 'updatedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) && data.id.size() <= 64 &&
+        data.sku is string && data.sku.size() >= 2 && data.sku.size() <= 48 && data.sku.matches('^[A-Za-z0-9_.\\-]+$') &&
+        data.barcode is string && data.barcode.size() >= 3 && data.barcode.size() <= 64 && data.barcode.matches('^[A-Za-z0-9_.\\-]+$') &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 140 &&
+        data.category is string && data.category.size() >= 2 && data.category.size() <= 64 &&
+        isValidId(data.locationId) && data.locationId.size() <= 64 &&
+        data.binCode is string && data.binCode.size() >= 1 && data.binCode.size() <= 32 &&
+        data.quantity is number && data.quantity >= 0 && data.quantity <= 100000000 &&
+        data.unit is string && data.unit.size() >= 1 && data.unit.size() <= 24 &&
+        data.minStockLevel is number && data.minStockLevel >= 0 && data.minStockLevel <= 100000000 &&
+        data.unitCost is number && data.unitCost >= 0 && data.unitCost <= 100000000 &&
+        data.supplier is string && data.supplier.size() <= 120 &&
+        data.notes is string && data.notes.size() <= 500 &&
+        isValidId(data.createdBy) &&
+        isValidId(data.updatedBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll([
+          'id', 'materialId', 'materialSku', 'materialName', 'type',
+          'quantityChange', 'previousQuantity', 'newQuantity',
+          'locationId', 'targetLocationId', 'referenceCode', 'reason',
+          'scanMethod', 'operatorId', 'operatorName', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'materialId', 'materialSku', 'materialName', 'type',
+          'quantityChange', 'previousQuantity', 'newQuantity',
+          'locationId', 'targetLocationId', 'referenceCode', 'reason',
+          'scanMethod', 'operatorId', 'operatorName', 'createdAt'
+        ]) &&
+        isValidId(data.id) && data.id.size() <= 64 &&
+        isValidId(data.materialId) && data.materialId.size() <= 64 &&
+        data.materialSku is string && data.materialSku.size() >= 2 && data.materialSku.size() <= 48 &&
+        data.materialName is string && data.materialName.size() >= 2 && data.materialName.size() <= 140 &&
+        data.type in ['IN', 'OUT', 'ADJUST', 'TRANSFER'] &&
+        data.quantityChange is number && data.quantityChange >= -100000000 && data.quantityChange <= 100000000 &&
+        data.previousQuantity is number && data.previousQuantity >= 0 && data.previousQuantity <= 100000000 &&
+        data.newQuantity is number && data.newQuantity >= 0 && data.newQuantity <= 100000000 &&
+        data.newQuantity == data.previousQuantity + data.quantityChange &&
+        isValidId(data.locationId) && data.locationId.size() <= 64 &&
+        data.targetLocationId is string && data.targetLocationId.size() <= 64 &&
+        data.referenceCode is string && data.referenceCode.size() <= 64 &&
+        data.reason is string && data.reason.size() <= 300 &&
+        data.scanMethod in ['manual', 'usb_scanner', 'camera_scanner'] &&
+        isValidId(data.operatorId) && data.operatorId == request.auth.uid &&
+        data.operatorName is string && data.operatorName.size() >= 1 && data.operatorName.size() <= 100 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidBackup(data) {
+      return data.keys().hasAll([
+          'id', 'backupDate', 'type', 'algorithm', 'checksumSha256',
+          'materialCount', 'transactionCount', 'locationCount',
+          'encryptedPayload', 'ivBase64', 'saltBase64',
+          'createdBy', 'createdByName', 'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'backupDate', 'type', 'algorithm', 'checksumSha256',
+          'materialCount', 'transactionCount', 'locationCount',
+          'encryptedPayload', 'ivBase64', 'saltBase64',
+          'createdBy', 'createdByName', 'createdAt'
+        ]) &&
+        isValidId(data.id) && data.id.size() <= 64 &&
+        data.backupDate is string && data.backupDate.size() == 10 && data.backupDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        data.type in ['daily_auto', 'manual_encrypted'] &&
+        data.algorithm is string && data.algorithm == 'AES-256-GCM' &&
+        data.checksumSha256 is string && data.checksumSha256.size() == 64 && data.checksumSha256.matches('^[a-f0-9]{64}$') &&
+        data.materialCount is number && data.materialCount >= 0 &&
+        data.transactionCount is number && data.transactionCount >= 0 &&
+        data.locationCount is number && data.locationCount >= 0 &&
+        data.encryptedPayload is string && data.encryptedPayload.size() >= 1 && data.encryptedPayload.size() <= 600000 &&
+        data.ivBase64 is string && data.ivBase64.size() >= 1 && data.ivBase64.size() <= 64 &&
+        data.saltBase64 is string && data.saltBase64.size() >= 1 && data.saltBase64.size() <= 64 &&
+        isValidId(data.createdBy) && data.createdBy == request.auth.uid &&
+        data.createdByName is string && data.createdByName.size() >= 1 && data.createdByName.size() <= 100 &&
+        data.createdAt is timestamp;
+    }
+
+    function isValidBackupPolicy(data) {
+      return data.keys().hasAll(['dailyAutoEnabled', 'lastBackupDate', 'retentionDays', 'updatedBy', 'updatedAt']) &&
+        data.keys().hasOnly(['dailyAutoEnabled', 'lastBackupDate', 'retentionDays', 'updatedBy', 'updatedAt']) &&
+        data.dailyAutoEnabled is bool &&
+        data.lastBackupDate is string && data.lastBackupDate.size() <= 10 &&
+        data.retentionDays is number && data.retentionDays >= 1 && data.retentionDays <= 3650 &&
+        isValidId(data.updatedBy) && data.updatedBy == request.auth.uid &&
+        data.updatedAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Rules
+    // -------------------------------------------------------------------------
+
+    // Connection check document (read-only ping)
+    match /test/connection {
+      allow get: if true;
+    }
+
+    // Users: Strict PII isolation & self-role escalation prevention
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isSignedIn() && (isOwner(userId) || isAdmin());
+      allow list: if isBootstrappedAdmin() || (isSignedIn() && existing().uid == request.auth.uid) || isAdmin();
+
+      allow create: if isValidId(userId) &&
+        isEmailVerified() &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == userId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (
+          (isBootstrappedAdmin() && isOwner(userId)) ||
+          (isOwner(userId) && incoming().role == 'viewer' && incoming().status == 'active' && incoming().email == request.auth.token.email) ||
+          isAdmin()
+        );
+
+      allow update: if isValidId(userId) &&
+        isEmailVerified() &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          (
+            isOwner(userId) &&
+            existing().status == 'active' &&
+            incoming().role == existing().role &&
+            incoming().status == existing().status &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'assignedLocationId', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isValidId(userId) && isAdmin() && !isOwner(userId);
+    }
+
+    // Locations: Warehouse & office hubs
+    match /locations/{locationId} {
+      allow get: if isValidId(locationId) && isViewerOrAbove();
+      allow list: if isViewerOrAbove();
+
+      allow create: if isValidId(locationId) &&
+        isAdmin() &&
+        isValidLocation(incoming()) &&
+        incoming().id == locationId &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(locationId) &&
+        isAdmin() &&
+        isValidLocation(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['code', 'name', 'city', 'region', 'isActive', 'updatedAt']);
+
+      allow delete: if isValidId(locationId) && isAdmin();
+    }
+
+    // Materials: Warehouse inventory catalog
+    match /materials/{materialId} {
+      allow get: if isValidId(materialId) && isViewerOrAbove();
+      allow list: if isViewerOrAbove();
+
+      allow create: if isValidId(materialId) &&
+        isManagerOrAbove() &&
+        isValidMaterial(incoming()) &&
+        incoming().id == materialId &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/locations/$(incoming().locationId));
+
+      allow update: if isValidId(materialId) &&
+        isValidMaterial(incoming()) &&
+        incoming().id == existing().id &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/locations/$(incoming().locationId)) &&
+        (
+          (
+            isManagerOrAbove() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'sku', 'barcode', 'name', 'category', 'locationId', 'binCode',
+              'quantity', 'unit', 'minStockLevel', 'unitCost', 'supplier', 'notes',
+              'updatedBy', 'updatedAt'
+            ])
+          ) ||
+          (
+            isOperatorOrAbove() &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['quantity', 'locationId', 'updatedBy', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isValidId(materialId) && isAdmin();
+    }
+
+    // Transactions: Immutable movement ledger atomically synced with Material stock
+    match /transactions/{transactionId} {
+      allow get: if isValidId(transactionId) && isViewerOrAbove();
+      allow list: if isViewerOrAbove();
+
+      allow create: if isValidId(transactionId) &&
+        isOperatorOrAbove() &&
+        isValidTransaction(incoming()) &&
+        incoming().id == transactionId &&
+        incoming().createdAt == request.time &&
+        (
+          (incoming().type == 'IN' && incoming().quantityChange > 0) ||
+          (incoming().type == 'OUT' && incoming().quantityChange < 0) ||
+          (incoming().type == 'ADJUST' && incoming().quantityChange != 0) ||
+          (incoming().type == 'TRANSFER' && isValidId(incoming().targetLocationId) && exists(/databases/$(database)/documents/locations/$(incoming().targetLocationId)))
+        ) &&
+        exists(/databases/$(database)/documents/materials/$(incoming().materialId)) &&
+        getAfter(/databases/$(database)/documents/materials/$(incoming().materialId)).data.quantity == incoming().newQuantity;
+
+      allow update, delete: if false;
+    }
+
+    // Backups: Daily & manual AES-256-GCM encrypted snapshots
+    match /backups/{backupId} {
+      allow get: if isValidId(backupId) && isManagerOrAbove();
+      allow list: if isManagerOrAbove();
+
+      allow create: if isValidId(backupId) &&
+        isManagerOrAbove() &&
+        isValidBackup(incoming()) &&
+        incoming().id == backupId &&
+        incoming().createdAt == request.time;
+
+      allow update: if false;
+      allow delete: if isValidId(backupId) && isAdmin();
+    }
+
+    // Settings: Backup policy configuration
+    match /settings/{settingId} {
+      allow get: if isValidId(settingId) && isViewerOrAbove();
+      allow list: if isViewerOrAbove();
+
+      allow create, update: if isValidId(settingId) &&
+        settingId == 'backupPolicy' &&
+        isManagerOrAbove() &&
+        isValidBackupPolicy(incoming()) &&
+        incoming().updatedAt == request.time;
+
+      allow delete: if false;
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "StockLedger — Warehouse Inventory & Movement Control",
+  "description": "Multi-location warehouse inventory ledger with real-time cloud sync, barcode scanning, low-stock alerts, CSV exports, automated weekly reports, AES-256 encrypted daily backups, and role-based access control.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
